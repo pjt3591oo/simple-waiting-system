@@ -1,0 +1,17 @@
+{
+  "name": "wating-batch",
+  "version": "1.0.0",
+  "description": "",
+  "main": "processing.js",
+  "scripts": {
+    "start": "node processing.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "ioredis": "^5.9.3",
+    "jsonwebtoken": "^9.0.3"
+  }
+}
