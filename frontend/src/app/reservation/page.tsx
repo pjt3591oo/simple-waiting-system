@@ -1,29 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function ReservationPage() {
   const [reservationData, setReservationData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Client-side check for the token
+    const storedToken = localStorage.getItem('waiting-token');
+    setToken(storedToken);
+    if (!storedToken) {
+        setError('No authentication token found. Please join the queue to get a token.');
+    }
+  }, []);
 
   const fetchReservationData = async () => {
+    if (!token) {
+      setError('Cannot fetch data without a token.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('waiting-token');
-      if (!token) {
-        throw new Error('No authentication token found. Please get a token from the waiting list first.');
-      }
-
       const response = await fetch('http://localhost:3000/reservation', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
       });
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch reservation data');
+        throw new Error((await response.json()).message || 'Failed to fetch reservation data');
       }
       const data = await response.json();
       setReservationData(data);
@@ -35,33 +41,37 @@ export default function ReservationPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
-      <h1 className="text-4xl font-bold mb-8">Reservation Page</h1>
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <p className="mb-4 text-gray-700">
-          This page demonstrates accessing a protected API endpoint. A dummy JWT token is used for authentication.
-        </p>
-        <button
-          onClick={fetchReservationData}
-          className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:opacity-50"
-          disabled={loading}
-        >
-          {loading ? 'Fetching...' : 'Fetch Reservation Data'}
-        </button>
+    <div className="max-w-[700px] mx-auto px-6 py-24">
+      <div className="bg-white p-8 md:p-12 rounded-xl shadow-sm border border-[#dbdfe6]">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold tracking-tight text-[#111418]">Protected Area</h1>
+          <p className="text-md text-[#60708a] mt-2">This is a protected resource. Use your token to fetch the data.</p>
+        </div>
 
-        {error && (
-          <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-            <p className="font-semibold">Error:</p>
-            <p>{error}</p>
-          </div>
-        )}
+        <div className="space-y-6">
+          <button
+            onClick={fetchReservationData}
+            disabled={loading || !token}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary text-black text-sm font-bold rounded-lg shadow-md hover:bg-primary/90 active:scale-95 transition-all disabled:bg-primary/50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Fetching Data...' : 'Fetch Reservation Data'}
+          </button>
 
-        {reservationData && (
-          <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
-            <p className="font-semibold">Reservation Data:</p>
-            <pre className="whitespace-pre-wrap break-all text-sm">{JSON.stringify(reservationData, null, 2)}</pre>
-          </div>
-        )}
+          {error && (
+             <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-center">
+                <p className="font-semibold text-red-700">{error}</p>
+            </div>
+          )}
+
+          {reservationData && (
+            <div>
+                <h3 className="text-lg font-bold text-gray-800 mb-2">Data Received:</h3>
+                <pre className="p-4 bg-background-light border border-[#dbdfe6] rounded-lg text-sm text-gray-800 whitespace-pre-wrap">
+                    {JSON.stringify(reservationData, null, 2)}
+                </pre>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -12,27 +12,14 @@ interface WaitingStatus {
   estimatedWaitTime: number | null;
 }
 
-function formatWaitTime(seconds: number): string {
+// Updated time formatting for the new design
+function formatWaitTimeForDisplay(seconds: number): { value: string; unit: string } {
   if (seconds < 60) {
-    return `${seconds}초`;
+    return { value: String(seconds), unit: 'sec' };
   }
   const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return `${minutes}분 ${remainingSeconds}초`;
+  return { value: String(minutes), unit: 'min' };
 }
-
-// --- SVG Icons ---
-const ClockIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const UsersIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-  </svg>
-);
 
 // --- Main Component ---
 export default function WaitingStatusPage() {
@@ -73,96 +60,120 @@ export default function WaitingStatusPage() {
       if (intervalId) clearInterval(intervalId);
     };
   }, [userId, loading]);
-
-  const handleGoToReservation = () => router.push('/reservation');
+  
+  const handleLeaveQueue = () => {
+    router.push('/');
+  }
 
   // --- Render Logic ---
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-xl text-gray-500">Loading status for <span className="font-semibold">{userId}</span>...</p>
+      <div className="py-12 text-center">
+        <p className="text-lg text-gray-500">Loading your queue status...</p>
       </div>
     );
   }
-
+  
   if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-lg text-center w-full max-w-md">
-            <h2 className="text-2xl font-bold text-red-600 mb-2">Error</h2>
-            <p className="text-gray-600">{error}</p>
-        </div>
+     return (
+      <div className="max-w-[1000px] mx-auto px-6 py-12 text-center">
+        <h1 className="text-4xl md:text-5xl font-black tracking-tight text-red-600">An Error Occurred</h1>
+        <p className="text-lg text-[#60708a] max-w-2xl mx-auto mt-3">{error}</p>
       </div>
     );
   }
 
   const isInQueue = status?.rank !== null;
-  const progress = (status && isInQueue && status.totalCount > 0) 
-    ? ((status.totalCount - status.rank) / status.totalCount) * 100 
-    : 0;
+  const hasToken = status?.token !== null;
+  const progress = (status && isInQueue && !hasToken && status.totalCount > 0)
+    ? (1 - (status.rank / status.totalCount)) * 100
+    : hasToken ? 100 : 0;
+  
+  const waitTime = status?.estimatedWaitTime !== null ? formatWaitTimeForDisplay(status.estimatedWaitTime) : { value: '0', unit: 'min' };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Your Position in the Queue</h1>
-          <p className="text-gray-500">User: <span className="font-semibold">{userId}</span></p>
+    <div className="max-w-[1000px] mx-auto px-6 py-12 flex flex-col gap-8">
+      {/* Hero Header */}
+      <div className="text-center space-y-3">
+        <h1 className="text-4xl md:text-5xl font-black tracking-tight text-[#111418]">
+          {hasToken ? "You're next!" : "Your spot is secured."}
+        </h1>
+        <p className="text-lg text-[#60708a] max-w-2xl mx-auto">
+          {hasToken
+            ? "A representative is ready to assist you. Please proceed to the reservation area."
+            : "Please keep this window open. We’ll notify you as soon as a representative is ready to assist you."}
+        </p>
+      </div>
+
+      {/* Main Status Card */}
+      <div className="bg-white rounded-xl shadow-sm border border-[#dbdfe6] overflow-hidden">
+        <div className="p-8 md:p-12">
+            {!hasToken && isInQueue ? (
+                <>
+                {/* Queue Stats Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+                    <div className="flex flex-col items-center text-center p-6 bg-background-light rounded-xl border border-[#dbdfe6]/50">
+                        <span className="text-primary font-bold text-sm uppercase tracking-widest mb-2">Current Position</span>
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-6xl font-black text-[#111418]">{status.rank! + 1}</span>
+                            <span className="text-xl font-bold text-[#60708a]">th</span>
+                        </div>
+                        <p className="text-[#60708a] mt-2 font-medium">of {status.totalCount} in line</p>
+                    </div>
+                    <div className="flex flex-col items-center text-center p-6 bg-background-light rounded-xl border border-[#dbdfe6]/50">
+                        <span className="text-primary font-bold text-sm uppercase tracking-widest mb-2">Estimated Wait</span>
+                         <div className="flex items-baseline gap-1">
+                            <span className="text-6xl font-black text-[#111418]">{waitTime.value}</span>
+                            <span className="text-xl font-bold text-[#60708a]">{waitTime.unit}</span>
+                        </div>
+                        <p className="text-[#60708a] mt-2 font-medium">Approximate time remaining</p>
+                    </div>
+                </div>
+
+                {/* Progress Tracker */}
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between text-sm font-bold text-[#111418]">
+                        <span className="flex items-center gap-2">
+                            <span className="size-2 rounded-full bg-primary animate-pulse"></span>
+                            Live Queue Progress
+                        </span>
+                        <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs tracking-tighter">{Math.round(progress)}% COMPLETED</span>
+                    </div>
+                    <div className="h-4 w-full bg-[#f0f2f5] rounded-full overflow-hidden">
+                        <div className="h-full bg-primary rounded-full transition-all duration-500 ease-out" style={{ width: `${progress}%` }}></div>
+                    </div>
+                    <div className="flex justify-between text-xs font-semibold text-[#60708a] uppercase tracking-wider px-1">
+                        <span>Joined</span>
+                        <span>Almost there</span>
+                        <span>Service</span>
+                    </div>
+                </div>
+                </>
+            ) : (
+                 <div className="text-center py-10">
+                    <h2 className="text-2xl font-bold text-gray-800">Your token is ready!</h2>
+                    <p className="text-gray-500 mt-2">You are no longer in the queue. Please proceed below.</p>
+                </div>
+            )}
         </div>
-
-        {status && isInQueue && !status.token ? (
-          <>
-            {/* Metrics */}
-            <div className="grid grid-cols-2 gap-4 text-center mb-6">
-              <div className="bg-indigo-50 p-4 rounded-lg">
-                <div className="flex items-center justify-center text-indigo-600 mb-1"><UsersIcon /></div>
-                <p className="text-sm text-gray-600">Your Rank</p>
-                <p className="text-2xl font-bold text-gray-900">{status.rank !== null ? status.rank + 1 : 'N/A'}</p>
-              </div>
-              <div className="bg-indigo-50 p-4 rounded-lg">
-                <div className="flex items-center justify-center text-indigo-600 mb-1"><ClockIcon /></div>
-                <p className="text-sm text-gray-600">Est. Wait Time</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {status.estimatedWaitTime === 0 && status.rank !== null
-                    ? '곧 입장 가능!'
-                    : status.estimatedWaitTime !== null
-                    ? formatWaitTime(status.estimatedWaitTime)
-                    : 'N/A'}
-                </p>
-              </div>
+        {/* Action Bar */}
+        <div className="bg-background-light/50 border-t border-[#dbdfe6] p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <p className="text-sm font-bold text-[#111418]">You are connected as <span className="text-primary">{userId}</span></p>
             </div>
-
-            {/* Gauge */}
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-sm font-medium text-gray-700">Your Progress</span>
-                <span className="text-sm font-medium text-gray-700">{status.totalCount} in queue</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
-              </div>
+            <div className="flex items-center gap-3 w-full md:w-auto">
+                 {hasToken ? (
+                    <button onClick={() => router.push('/reservation')} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-primary text-black text-sm font-bold rounded-lg shadow-md hover:bg-primary/90 active:scale-95 transition-all">
+                        Proceed to Reservation
+                    </button>
+                 ) : (
+                    <button onClick={handleLeaveQueue} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-red-50 border border-red-100 text-red-600 text-sm font-bold rounded-lg hover:bg-red-100 transition-all">
+                        <span className="material-symbols-outlined text-lg">logout</span>
+                        Leave Queue
+                    </button>
+                 )}
             </div>
-          </>
-        ) : (
-          <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-blue-800">{status?.token ? "Your token is ready!" : (status?.rank === null ? "You are not currently in the waiting list." : "You are in the processing queue!")}</p>
-          </div>
-        )}
-        
-        {/* Token Area */}
-        {status?.token && (
-          <div className="mt-6">
-            <div className="p-4 bg-green-100 border border-green-300 rounded-lg text-center">
-              <p className="font-semibold text-green-800">Your token is ready!</p>
-              <p className="text-xs text-green-700 break-all mt-2">{status.token}</p>
-            </div>
-            <button
-              onClick={handleGoToReservation}
-              className="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:shadow-outline transition-transform transform hover:scale-105"
-            >
-              Proceed to Reservation
-            </button>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
