@@ -4,7 +4,7 @@ const redisClient = require('../utils/redis');
 const router = express.Router();
 
 
-const NEXT_PROCESSING_COUNT = 5;
+const NEXT_PROCESSING_COUNT = 1;
 const WAITING_LIST_KEY = 'waitingList';
 const WAITING_TOKEN_KEY = 'wating-token';
 
@@ -21,11 +21,30 @@ router.get('/check', async function(req, res, next) {
       return res.status(404).json({ message: '유저가 웨이팅 리스트에 없습니다.' });
     }
 
+    let estimatedWaitTime = null;
+    try {
+      const metrics = await redisClient.hgetall('processing_metrics');
+      console.log(metrics)
+      if (metrics && metrics.last_processed_count && metrics.interval_seconds && rank !== null) {
+        const lastProcessedCount = parseInt(metrics.last_processed_count, 10);
+        const intervalSeconds = parseInt(metrics.interval_seconds, 10);
+
+        if (lastProcessedCount > 0) {
+          const timePerUser = intervalSeconds / lastProcessedCount;
+          estimatedWaitTime = Math.round(rank * timePerUser);
+        }
+      }
+    } catch (metricError) {
+      console.error('Could not calculate estimated wait time:', metricError);
+      // Fail silently and just don't return an estimate
+    }
+
     res.json({ 
       rank, 
       totalCount, 
       token, 
-      processingCount: NEXT_PROCESSING_COUNT 
+      processingCount: NEXT_PROCESSING_COUNT,
+      estimatedWaitTime, // in seconds
     });
     
   } catch (err) {

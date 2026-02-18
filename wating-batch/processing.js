@@ -4,7 +4,7 @@ const WAITING_LIST_KEY = 'waitingList';
 
 let isProcessing = false;
 
-const TIMER_INTERVAL = 10000; // 1.5초마다 실행  
+const TIMER_INTERVAL = 15000; // 1.5초마다 실행  
 const PROCESSING_COUNT = 1; // 한 번에 처리할 웨이팅 수
 const TOKEN_KEY = 'wating-token';
 
@@ -28,6 +28,15 @@ async function processWaitingList() {
       await redisClient.zrem(WAITING_LIST_KEY, userId);
 
       await redisClient.hset(TOKEN_KEY, userId, token); // 토큰 저장 (예시)
+    }
+
+    // Store processing metrics for wait time estimation
+    if (waitings.length > 0) {
+      const metrics = {
+        last_processed_count: PROCESSING_COUNT,
+        interval_seconds: TIMER_INTERVAL / 1000,
+      };
+      await redisClient.hset('processing_metrics', metrics);
     }
     
     console.log('웨이팅 리스트 처리 완료');

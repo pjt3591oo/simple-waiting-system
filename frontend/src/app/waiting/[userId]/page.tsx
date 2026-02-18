@@ -8,6 +8,16 @@ interface WaitingStatus {
   totalCount: number;
   token: string | null;
   processingCount: number;
+  estimatedWaitTime: number | null;
+}
+
+function formatWaitTime(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds}초`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}분 ${remainingSeconds}초`;
 }
 
 export default function WaitingStatusPage() {
@@ -17,6 +27,25 @@ export default function WaitingStatusPage() {
   const [status, setStatus] = useState<WaitingStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const Gauge = ({ rank, totalCount }: { rank: number; totalCount: number }) => {
+    if (rank === null || totalCount === 0) {
+      return null;
+    }
+
+    const progress = totalCount > 0 ? ((totalCount - rank) / totalCount) * 100 : 0;
+
+    return (
+      <div className="w-full bg-gray-200 rounded-full h-4 my-4">
+        <div
+          className="bg-purple-500 h-4 rounded-full text-xs font-medium text-blue-100 text-center p-0.5 leading-none"
+          style={{ width: `${progress}%` }}
+        >
+          {`${Math.round(progress)}%`}
+        </div>
+      </div>
+    );
+  };
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
@@ -93,6 +122,12 @@ export default function WaitingStatusPage() {
             <p className="text-lg mb-2">
               <span className="font-semibold">Total in Waiting:</span> {status.totalCount}
             </p>
+            {status.rank !== null && <Gauge rank={status.rank} totalCount={status.totalCount} />}
+            {status.rank !== null && status.estimatedWaitTime !== null && (
+              <p className="text-lg mb-2 font-bold text-blue-600">
+                <span className="font-semibold">Estimated Wait Time:</span> {formatWaitTime(status.estimatedWaitTime)}
+              </p>
+            )}
             <p className="text-lg mb-2">
               <span className="font-semibold">Processing Count:</span> {status.processingCount}
             </p>
@@ -121,11 +156,12 @@ export default function WaitingStatusPage() {
                 <p>You are not currently in the waiting list.</p>
               </div>
             )}
+
           </>
         ) : (
-          <p className="text-lg">No status found.</p>
+          <p className="text-lg">No waiting status available.</p>
         )}
       </div>
     </div>
   );
-}
+} 
