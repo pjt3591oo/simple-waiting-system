@@ -3,8 +3,9 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+// --- Interfaces & Helpers ---
 interface WaitingStatus {
-  rank: number;
+  rank: number | null;
   totalCount: number;
   token: string | null;
   processingCount: number;
@@ -20,6 +21,20 @@ function formatWaitTime(seconds: number): string {
   return `${minutes}분 ${remainingSeconds}초`;
 }
 
+// --- SVG Icons ---
+const ClockIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const UsersIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+  </svg>
+);
+
+// --- Main Component ---
 export default function WaitingStatusPage() {
   const params = useParams();
   const router = useRouter();
@@ -28,140 +43,123 @@ export default function WaitingStatusPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const Gauge = ({ rank, totalCount }: { rank: number; totalCount: number }) => {
-    if (rank === null || totalCount === 0) {
-      return null;
-    }
-
-    const progress = totalCount > 0 ? ((totalCount - rank) / totalCount) * 100 : 0;
-
-    return (
-      <div className="w-full bg-gray-200 rounded-full h-4 my-4">
-        <div
-          className="bg-purple-500 h-4 rounded-full text-xs font-medium text-blue-100 text-center p-0.5 leading-none"
-          style={{ width: `${progress}%` }}
-        >
-          {`${Math.round(progress)}%`}
-        </div>
-      </div>
-    );
-  };
-
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
-
     const fetchWaitingStatus = async () => {
       try {
         const response = await fetch(`http://localhost:3000/waiting/check?userId=${userId}`);
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to fetch waiting status');
+          throw new Error((await response.json()).message || 'Failed to fetch status');
         }
         const data: WaitingStatus = await response.json();
         setStatus(data);
         if (data.token) {
           localStorage.setItem('waiting-token', data.token);
-          if (intervalId) {
-            clearInterval(intervalId); // Stop polling once token is received
-          }
+          if (intervalId) clearInterval(intervalId);
         }
       } catch (err: any) {
         setError(err.message);
-        if (intervalId) {
-          clearInterval(intervalId); // Stop polling on error
-        }
+        if (intervalId) clearInterval(intervalId);
       } finally {
-        // Only set loading to false on the initial fetch
-        if (loading) {
-          setLoading(false);
-        }
+        if (loading) setLoading(false);
       }
     };
 
     if (userId) {
-      fetchWaitingStatus(); // Initial fetch
-      intervalId = setInterval(fetchWaitingStatus, 2000); // Poll every 2 seconds
+      fetchWaitingStatus();
+      intervalId = setInterval(fetchWaitingStatus, 2000);
     }
-
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId); // Cleanup on component unmount
-      }
+      if (intervalId) clearInterval(intervalId);
     };
   }, [userId, loading]);
 
-  const handleGoToReservation = () => {
-    router.push('/reservation');
-  };
+  const handleGoToReservation = () => router.push('/reservation');
 
+  // --- Render Logic ---
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <p className="text-xl">Loading waiting status for {userId}...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-xl text-gray-500">Loading status for <span className="font-semibold">{userId}</span>...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <p className="text-xl text-red-500">Error: {error}</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-lg text-center w-full max-w-md">
+            <h2 className="text-2xl font-bold text-red-600 mb-2">Error</h2>
+            <p className="text-gray-600">{error}</p>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
-      <h1 className="text-4xl font-bold mb-8">Waiting Status for {userId}</h1>
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        {status ? (
-          <>
-            <p className="text-lg mb-2">
-              <span className="font-semibold">Your Rank:</span> {status.rank !== null ? status.rank + 1 : 'Not in list'}
-            </p>
-            <p className="text-lg mb-2">
-              <span className="font-semibold">Total in Waiting:</span> {status.totalCount}
-            </p>
-            {status.rank !== null && <Gauge rank={status.rank} totalCount={status.totalCount} />}
-            {status.rank !== null && status.estimatedWaitTime !== null && (
-              <p className="text-lg mb-2 font-bold text-blue-600">
-                <span className="font-semibold">Estimated Wait Time:</span> {formatWaitTime(status.estimatedWaitTime)}
-              </p>
-            )}
-            <p className="text-lg mb-2">
-              <span className="font-semibold">Processing Count:</span> {status.processingCount}
-            </p>
-            {status.token && (
-              <>
-                <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
-                  <p className="font-semibold">Your Waiting Token:</p>
-                  <p className="break-all text-sm">{status.token}</p>
-                </div>
-                <button
-                  onClick={handleGoToReservation}
-                  className="mt-4 w-full bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-                >
-                  Go to Reservation
-                </button>
-              </>
-            )}
-            {!status.token && status.rank !== null && status.rank < status.processingCount && (
-              <div className="mt-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
-                <p className="font-semibold">You are in the processing queue!</p>
-                <p>Please wait for your turn to be assigned a token.</p>
-              </div>
-            )}
-            {status.rank === null && (
-              <div className="mt-4 p-4 bg-blue-100 border border-blue-400 text-blue-700 rounded">
-                <p>You are not currently in the waiting list.</p>
-              </div>
-            )}
+  const isInQueue = status?.rank !== null;
+  const progress = (status && isInQueue && status.totalCount > 0) 
+    ? ((status.totalCount - status.rank) / status.totalCount) * 100 
+    : 0;
 
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+      <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-800">Your Position in the Queue</h1>
+          <p className="text-gray-500">User: <span className="font-semibold">{userId}</span></p>
+        </div>
+
+        {status && isInQueue && !status.token ? (
+          <>
+            {/* Metrics */}
+            <div className="grid grid-cols-2 gap-4 text-center mb-6">
+              <div className="bg-indigo-50 p-4 rounded-lg">
+                <div className="flex items-center justify-center text-indigo-600 mb-1"><UsersIcon /></div>
+                <p className="text-sm text-gray-600">Your Rank</p>
+                <p className="text-2xl font-bold text-gray-900">{status.rank !== null ? status.rank + 1 : 'N/A'}</p>
+              </div>
+              <div className="bg-indigo-50 p-4 rounded-lg">
+                <div className="flex items-center justify-center text-indigo-600 mb-1"><ClockIcon /></div>
+                <p className="text-sm text-gray-600">Est. Wait Time</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {status.estimatedWaitTime !== null ? formatWaitTime(status.estimatedWaitTime) : 'N/A'}
+                </p>
+              </div>
+            </div>
+
+            {/* Gauge */}
+            <div>
+              <div className="flex justify-between mb-1">
+                <span className="text-sm font-medium text-gray-700">Your Progress</span>
+                <span className="text-sm font-medium text-gray-700">{status.totalCount} in queue</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
+              </div>
+            </div>
           </>
         ) : (
-          <p className="text-lg">No waiting status available.</p>
+          <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-blue-800">{status?.token ? "Your token is ready!" : (status?.rank === null ? "You are not currently in the waiting list." : "You are in the processing queue!")}</p>
+          </div>
+        )}
+        
+        {/* Token Area */}
+        {status?.token && (
+          <div className="mt-6">
+            <div className="p-4 bg-green-100 border border-green-300 rounded-lg text-center">
+              <p className="font-semibold text-green-800">Your token is ready!</p>
+              <p className="text-xs text-green-700 break-all mt-2">{status.token}</p>
+            </div>
+            <button
+              onClick={handleGoToReservation}
+              className="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:shadow-outline transition-transform transform hover:scale-105"
+            >
+              Proceed to Reservation
+            </button>
+          </div>
         )}
       </div>
     </div>
   );
-} 
+}
