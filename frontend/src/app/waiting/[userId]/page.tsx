@@ -122,7 +122,11 @@ export default function WaitingStatusPage() {
                 <div className="flex items-center justify-center text-indigo-600 mb-1"><ClockIcon /></div>
                 <p className="text-sm text-gray-600">Est. Wait Time</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {status.estimatedWaitTime !== null ? formatWaitTime(status.estimatedWaitTime) : 'N/A'}
+                  {status.estimatedWaitTime === 0 && status.rank !== null
+                    ? '곧 입장 가능!'
+                    : status.estimatedWaitTime !== null
+                    ? formatWaitTime(status.estimatedWaitTime)
+                    : 'N/A'}
                 </p>
               </div>
             </div>
